@@ -1,0 +1,72 @@
+module master(
+input wire clk,
+input wire rst,
+input wire start,
+input wire MISO,
+input wire [7:0]data_in,
+output reg [7:0]data_out,
+output reg sclk,
+output reg done,
+output reg cs,
+output reg MOSI);//port declaration
+
+reg [7:0]store;//temprory register
+reg [2:0]bit_count;//to count the number of bits transfered 
+reg [2:0]state;//to find which state of FSM should be
+
+localparam IDLE = 3'd0;//the states of FSM
+localparam LOAD = 3'd1;
+localparam SHIFT= 3'd2;
+localparam DONE = 3'd3;
+
+always @(posedge clk or posedge rst)begin
+if(rst)begin//reset statement
+data_out <= 0;//resetting all the values
+done <= 0;
+cs <= 0;
+MOSI <= 0;
+store <= 0;
+bit_count <= 0;
+state <= IDLE;
+end
+else begin
+   case(state)
+     IDLE:begin//idle state
+         cs <= 1;//make cs high
+         bit_count <= 0;//ready the bit counter
+         sclk <= 0;//make the slave_clock to 0
+         data_out <= 0;//reset the data
+         done <= 0;//low the done flag
+         MOSI <= 0;//master didn't send any data to slave make MOSI to 0
+         if(start == 1)//if start flag turns high
+           state <= LOAD;//move to load state
+         else
+           state <= IDLE;//else to IDLE state
+         end
+     LOAD:begin
+         store <= data_in;//start to load data in temprory register
+         cs <= 0;//control slave is low where we can select the slave
+         state <= SHIFT;//move to SHIFT state
+         end
+     SHIFT:begin
+          sclk <= ~sclk;//toggle the slave clock---the toggling will be so quick if u need to seee visibly you can add clock divider
+          MOSI <= store[7];//start to store the MSB to MOSI register
+          store <= {store[6:0], 1'b0}; //move the temprory register towards left 
+          data_out <= {data_out[6:0], MISO}; //load the value with the MSB bit of MISO and shift towards left
+          bit_count <= bit_count + 1;//increment bitcounter
+          if(bit_count == 7)//if it attains 7 all bits have transmitted
+            state <= DONE;//if completed then move to DONE state 
+          else
+            state <= SHIFT;//else shift until it reaches
+          end
+     DONE:begin
+         cs <= 1;//deselect the slave control by making it high
+         done <= 1;//high the done flag to say the transmission has completed
+         state <= IDLE;//move the state to IDLE 
+         MOSI <= 0;//make the MOSI to 0 so the next transmission will be new and clear 
+         bit_count <= 0;//reset the bits counter
+         end 
+         endcase
+end
+end
+endmodule
