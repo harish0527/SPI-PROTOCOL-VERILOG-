@@ -1,0 +1,65 @@
+module spi_tb;
+
+  
+  reg clk;
+  reg rst;
+  reg start;
+  reg [7:0] master_data_in;
+  reg [7:0] slave_data_in;
+  wire [7:0] master_data_out;
+  wire [7:0] slave_data_out;
+  wire done_master;
+  wire done_slave;
+
+  
+  wire MOSI;
+  wire MISO;
+  wire SCLK;
+  wire CS;
+
+ 
+  initial clk = 0;
+  always #5 clk = ~clk;  
+  
+  master m1 (
+    .clk(clk),
+    .rst(rst),
+    .start(start),
+    .data_in(master_data_in),
+    .MISO(MISO),
+    .MOSI(MOSI),
+    .sclk(SCLK),
+    .cs(CS),
+    .data_out(master_data_out),
+    .done(done_master)
+  );
+
+  slave s1 (
+    .rst(rst),
+    .MOSI(MOSI),
+    .cs(CS),
+    .sclk(SCLK),
+    .data_in(slave_data_in),
+    .data_out(slave_data_out),
+    .done(done_slave),
+    .MISO(MISO)
+  );
+
+  
+  initial begin
+    rst = 1;
+    start = 0;
+    master_data_in = 8'hA5;  
+    slave_data_in  = 8'h3C;  
+    #20 rst = 0;
+    #10 start = 1;
+    #10 start = 0;
+    wait(done_master);
+    wait(done_slave);
+    $display("Master sent: %h, Slave received: %h", master_data_in, slave_data_out);
+    $display("Slave sent: %h, Master received: %h", slave_data_in, master_data_out);
+
+    #50 $finish;
+  end
+
+endmodule
