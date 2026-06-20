@@ -1,0 +1,65 @@
+module slave(
+input wire rst,
+input wire MOSI,
+input wire cs,
+input wire sclk,
+input wire [7:0]data_in,
+output reg [7:0]data_out,
+output reg done,
+output reg MISO);//port decllaration for Slave
+
+reg [7:0]store;//temprory register
+reg [7:0]tx;//temprory register to store slave's data that needs to be transmitted to the master
+reg [2:0]state;
+reg [2:0]bit_count;//bit counter
+
+
+localparam IDLE = 3'd0;//states of the FSM
+localparam REC = 3'd1;
+localparam DONE = 3'd2;
+
+always @(posedge sclk or posedge rst)begin
+if(rst)begin//reset block
+data_out <= 0;//reset every output so the true output will be clean
+done <= 0;
+bit_count <= 0;
+tx <= 0;
+store <= 0;
+state <= IDLE;
+MISO <= 0;
+end
+else begin
+case(state)
+    IDLE:begin
+        if(cs == 0)begin//if slave control is low then slave is selected so
+          state <= REC;//state changes to REC state
+          bit_count <= 0;//ready the bit counter
+          tx <= data_in;//store the data of slave that to be transmitted o Master in TX register 
+          store <= 0;//clear the register
+        end
+        else
+          state <= IDLE;//else loop in IDLE state
+        end
+    REC: begin
+            store <= {store[6:0], MOSI};//start to store the MSB of MOSI to store register and shift it by left
+            MISO <= tx[7];//move the MSB bit of tx register to MISO  
+            tx   <= {tx[6:0], 1'b0};//shift the tx register by left 
+            bit_count <= bit_count + 1;//increment the bit count
+            if (bit_count == 3'd7) begin
+                state <= DONE;//if all bits transfered move to DONE state
+            end 
+            else begin
+                state <= REC;//else loop inside the REC state 
+            end
+           end
+    DONE:begin
+        data_out <= store;//move the data stored in data_out register
+        done <= 1;//high the done flag so to now that the transmission has completed
+        MISO <= 0;
+        state <= IDLE;//move the state to IDLE state 
+        end 
+        endcase
+        
+end
+end
+endmodule
